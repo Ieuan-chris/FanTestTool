@@ -26,6 +26,13 @@ void FanController::run()
         emit parseError();
     }
 
+    foreach(auto testItem, testItems) {
+        qDebug() << testItem.itemName;
+        foreach(auto key, testItem.procedures.keys()) {
+              qDebug() << key << ": " << testItem.procedures.value(key).spd;
+        }
+    }
+
     QFile logFile(model.logFile);
 
     if (!bExit && !logFile.open(QFile::WriteOnly | QFile::Append)) {
@@ -90,23 +97,50 @@ bool FanController::parseConfig(QVector<TestItem> &testItems)
         return ret;
     }
 
-    qDebug() << "Is it json array : " << jsonDoc.isArray();
-
     if (jsonDoc.isArray()) {
         QJsonArray tests = jsonDoc.array();
 
         foreach(auto test, tests) {
+            TestItem testItem;
+            ItemProcedure itemProcedure;
             if (test.isObject()) {
                 QJsonObject obj = test.toObject();
 
-                if (obj.contains(QString("TestName")))
-                    qDebug() << "TestName: " << obj.value(QString("TestName"));
-                if(obj.contains(QString("TestProcedures")))
-                    qDebug() << "TestProcedures: " << obj.value(QString("TestProcedures"));
+                if (obj.contains(QString("TestName"))) {
+//                    qDebug() << "TestName: " << obj.value(QString("TestName"));
+                    testItem.itemName = obj.value(QString("TestName")).toString();
+                }
+                if(obj.contains(QString("TestProcedures"))) {
+                    QJsonArray procedures = obj.value(QString("TestProcedures")).toArray();
+                    QStringList pduList;
+                    pduList << "speed" << "forward" << "duration";
+                    foreach(auto procedure, procedures) {
+                        if (procedure.isObject()) {
+                            QJsonObject proObj = procedure.toObject();
+//                            qDebug() << "Procedu :" << proObj.keys();
+                            QString subProcedure = proObj.keys().at(0);
+                            QJsonObject subPro = proObj.value(subProcedure).toObject();
+                            foreach(auto sPdu, pduList) {
+                                if (subPro.contains(sPdu)) {
+//                                    qDebug() << subPro.value(sPdu);
+                                    if (sPdu == "forward") {
+                                        itemProcedure.isForward = subPro.value(sPdu).toBool();
+                                    } else if (sPdu == "speed"){
+                                        itemProcedure.spd = static_cast<short>(subPro.value(sPdu).toInt());
+                                    } else {
+                                        itemProcedure.duration = subPro.value(sPdu).toInt();
+                                    }
+                                }
+                            }
+                            qDebug() << subProcedure <<itemProcedure.spd << itemProcedure.isForward << itemProcedure.duration;
+                            testItem.procedures.insert(subProcedure, itemProcedure);
+                        }
+                    }
+                    testItems.append(testItem);
+                    ret = true;
+                }
             }
         }
-    } else if (jsonDoc.isObject()) {
-        qDebug() << "jsonDoc is object: " << true;
     }
 
     return ret;

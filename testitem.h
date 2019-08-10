@@ -7,14 +7,14 @@
 
 
 struct ItemProcedure {
-    ushort spd;
+    short spd;
     bool isForward;
-    uint time_ms;
+    int duration;
 };
 
 struct TestItem {
     QString itemName;
-    QVector<QMap<QString, ItemProcedure> > procedures;
+    QMap<QString, ItemProcedure> procedures;
 };
 
 #endif // TESTITEM_H
