@@ -42,7 +42,7 @@ void Dialog::toggleFanStatu (int state)
 {
     if (state == Qt::Checked) {
         // 判断输入是否正确
-        if (ui->RecordFilePathText->text().isEmpty() || ui->configFilePathText->text().isEmpty()) {
+        if (ui->RecordFilePathText->text().isEmpty() || (ui->autoModeEnableBox->isChecked() && ui->configFilePathText->text().isEmpty())) {
             QMessageBox msgBox;
             msgBox.setText(tr("请选择配置文件和记录文件."));
             msgBox.exec();
@@ -52,7 +52,7 @@ void Dialog::toggleFanStatu (int state)
         }
 
         model.bAuto = ui->autoModeEnableBox->isChecked();
-        model.fanSpd = ui->speedLevelCombox->currentIndex();
+        model.fanSpd = ui->speedLevelCombox->currentIndex() + 1;
         model.logFile = ui->RecordFilePathText->text();
         model.bForward = ui->directionBox->isChecked();
         model.configFile = ui->configFilePathText->text();

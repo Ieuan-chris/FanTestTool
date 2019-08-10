@@ -42,7 +42,6 @@ void FanController::run()
         bExit = true;
         emit parseError();
     }
-    QTextStream out;
     if (!bExit)
         out.setDevice(&logFile);
 
@@ -52,17 +51,53 @@ void FanController::run()
 //        model.on.wait(&model.lock);
 
         if (model.bAuto) {
-            qDebug() << tr("start auto test");
+            qDebug() << "start auto test";
+            foreach(auto testItem, testItems) {
+                out << "TestItem: " << testItem.itemName << ":" << endl;
+                for (int i = 0; i < testItem.repeats; ++i) {
+                    foreach(auto key, testItem.procedures.keys()) {
+                        out << '\t' << "[ " << i << " ] SubItem: " << key << ":" << endl;
+                        if(!sendSubproInstruction(testItem.procedures.value(key))) {
+                            qDebug() << "send cmd failed";
+                            bExit = true;
+                            emit parseError();
+                        }
+
+                        locker.lock();
+                        cond.wait(&locker, static_cast<unsigned long>(testItem.procedures.value(key).duration));
+                        locker.unlock();
+
+                        if (bExit)
+                            break;
+                    }
+                    if (bExit)
+                        break;
+                }
+                if (bExit)
+                    break;
+            }
         }
         else {
             qDebug() << tr("start manual test");
+            ItemProcedure single;
+            single.duration = 0;
+            single.spd = static_cast<short>(model.fanSpd);
+            single.isForward = model.bForward;
+            if(!sendSubproInstruction(single)) {
+                qDebug() << "send cmd failed";
+                bExit = true;
+                emit parseError();
+            }
+
+            locker.lock();
+            cond.wait(&locker);
+            locker.unlock();
         }
+
+        out.flush();
 
 //        model.lock.unlock();
 
-        locker.lock();
-        cond.wait(&locker, 1000);
-        locker.unlock();
     }
 
     qDebug() << tr("release controller resource");
@@ -106,39 +141,42 @@ bool FanController::parseConfig(QVector<TestItem> &testItems)
             if (test.isObject()) {
                 QJsonObject obj = test.toObject();
 
-                if (obj.contains(QString("TestName"))) {
+                if (!obj.contains(QString("TestName")) || !obj.contains(QString("Repeats")) || !obj.contains(QString("TestProcedures"))) {
 //                    qDebug() << "TestName: " << obj.value(QString("TestName"));
-                    testItem.itemName = obj.value(QString("TestName")).toString();
+                    ret = false;
+                    return ret;
                 }
-                if(obj.contains(QString("TestProcedures"))) {
-                    QJsonArray procedures = obj.value(QString("TestProcedures")).toArray();
-                    QStringList pduList;
-                    pduList << "speed" << "forward" << "duration";
-                    foreach(auto procedure, procedures) {
-                        if (procedure.isObject()) {
-                            QJsonObject proObj = procedure.toObject();
+                testItem.itemName = obj.value(QString("TestName")).toString();
+                testItem.repeats = obj.value(QString("Repeats")).toInt();
+
+                QJsonArray procedures = obj.value(QString("TestProcedures")).toArray();
+                QStringList pduList;
+                pduList << "speed" << "forward" << "duration";
+                foreach(auto procedure, procedures) {
+                    if (procedure.isObject()) {
+                        QJsonObject proObj = procedure.toObject();
 //                            qDebug() << "Procedu :" << proObj.keys();
-                            QString subProcedure = proObj.keys().at(0);
-                            QJsonObject subPro = proObj.value(subProcedure).toObject();
-                            foreach(auto sPdu, pduList) {
-                                if (subPro.contains(sPdu)) {
+                        QString subProcedure = proObj.keys().at(0);
+                        QJsonObject subPro = proObj.value(subProcedure).toObject();
+                        foreach(auto sPdu, pduList) {
+                            if (subPro.contains(sPdu)) {
 //                                    qDebug() << subPro.value(sPdu);
-                                    if (sPdu == "forward") {
-                                        itemProcedure.isForward = subPro.value(sPdu).toBool();
-                                    } else if (sPdu == "speed"){
-                                        itemProcedure.spd = static_cast<short>(subPro.value(sPdu).toInt());
-                                    } else {
-                                        itemProcedure.duration = subPro.value(sPdu).toInt();
-                                    }
+                                if (sPdu == "forward") {
+                                    itemProcedure.isForward = subPro.value(sPdu).toBool();
+                                } else if (sPdu == "speed"){
+                                    itemProcedure.spd = static_cast<short>(subPro.value(sPdu).toInt());
+                                } else {
+                                    itemProcedure.duration = subPro.value(sPdu).toInt();
                                 }
                             }
-                            qDebug() << subProcedure <<itemProcedure.spd << itemProcedure.isForward << itemProcedure.duration;
-                            testItem.procedures.insert(subProcedure, itemProcedure);
                         }
+                        qDebug() << subProcedure <<itemProcedure.spd << itemProcedure.isForward << itemProcedure.duration;
+                        testItem.procedures.insert(subProcedure, itemProcedure);
                     }
-                    testItems.append(testItem);
-                    ret = true;
                 }
+                testItems.append(testItem);
+                ret = true;
+
             }
         }
     }
@@ -152,4 +190,16 @@ void FanController::wakeAndWaitForEnd()
     locker.lock();
     cond.wakeOne();
     locker.unlock();
+}
+
+bool FanController::sendSubproInstruction(const ItemProcedure &subItem)
+{
+    if (out.device())
+        out << '\t' << '\t' << "send cmd: " << "speed=" << subItem.spd << ", forward="
+            << subItem.isForward << ", duration=" << subItem.duration << endl;
+
+    qDebug() << "Send cmd: " << "speed=" << subItem.spd << ", forward="
+             << subItem.isForward << ", duration=" << subItem.duration << endl;
+
+    return true;
 }

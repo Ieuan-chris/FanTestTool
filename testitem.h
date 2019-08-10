@@ -14,6 +14,7 @@ struct ItemProcedure {
 
 struct TestItem {
     QString itemName;
+    int repeats;
     QMap<QString, ItemProcedure> procedures;
 };
 

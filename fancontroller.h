@@ -5,6 +5,7 @@
 #include <fanmodel.h>
 #include <QWaitCondition>
 #include <QMutex>
+#include <QTextStream>
 
 
 #include <QVector>
@@ -31,8 +32,10 @@ private:
     FanModel &model;
     bool bExit;
     bool parseConfig(QVector<TestItem> &testItems);
+    bool sendSubproInstruction(const ItemProcedure &subItem);
     QWaitCondition cond;
     QMutex locker;
+    QTextStream out;
 
     // QThread interface
 protected:
