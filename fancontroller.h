@@ -6,6 +6,8 @@
 #include <QWaitCondition>
 #include <QMutex>
 #include <QTextStream>
+#include <QSerialPort>
+#include <QDataStream>
 
 
 #include <QVector>
@@ -20,22 +22,26 @@ public:
 //    fanController();
     explicit FanController(FanModel &model);
 
+    enum Error {JSON_PARSE_ERROR, LOG_FILE_OPEN_ERROR,PORT_OPEN_ERROR, COMMAND_SEND_ERROR};
+    static unsigned short crc16_table_256(unsigned short sum, unsigned char *p, unsigned int len);
 //    void set_model(FanModel *model) {
 //        this->model = model;
 //    }
+    static const unsigned short crc16_table[256];
 
 Q_SIGNALS:
-    void parseError(void);
+    void errorOccured(Error err);
 
 
 private:
     FanModel &model;
     bool bExit;
     bool parseConfig(QVector<TestItem> &testItems);
-    bool sendSubproInstruction(const ItemProcedure &subItem);
+    bool sendSubproInstruction(QSerialPort &out, const ItemProcedure &subItem, bool isStopMachine = false);
     QWaitCondition cond;
     QMutex locker;
     QTextStream out;
+    QSerialPort serialout;
 
     // QThread interface
 protected:
@@ -43,7 +49,12 @@ protected:
 
 public Q_SLOTS:
     void wakeAndWaitForEnd(void);
+    void waitAllWritten(qint64 bytes);
+    void waitAllRead(void);
+
 
 };
+
+
 
 #endif // FANCONTROLLER_H

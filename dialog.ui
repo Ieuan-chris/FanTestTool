@@ -18,7 +18,7 @@
     <rect>
      <x>10</x>
      <y>9</y>
-     <width>661</width>
+     <width>822</width>
      <height>751</height>
     </rect>
    </property>
@@ -29,10 +29,10 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <property name="spacing">
-       <number>200</number>
+       <number>0</number>
       </property>
       <property name="sizeConstraint">
-       <enum>QLayout::SetMinAndMaxSize</enum>
+       <enum>QLayout::SetFixedSize</enum>
       </property>
       <item>
        <widget class="QCheckBox" name="startup">
@@ -49,15 +49,34 @@
        </widget>
       </item>
       <item>
+       <widget class="QLabel" name="label">
+        <property name="maximumSize">
+         <size>
+          <width>50</width>
+          <height>40</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>端口:</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QComboBox" name="serialPortsSelector">
         <property name="minimumSize">
          <size>
-          <width>70</width>
+          <width>40</width>
           <height>40</height>
          </size>
         </property>
         <property name="focusPolicy">
          <enum>Qt::ClickFocus</enum>
+        </property>
+        <property name="sizeAdjustPolicy">
+         <enum>QComboBox::AdjustToContents</enum>
         </property>
        </widget>
       </item>

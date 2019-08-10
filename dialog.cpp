@@ -22,14 +22,11 @@ Dialog::Dialog(FanModel &model, QWidget *parent) :
     ui->speedLevelCombox->setCurrentIndex(0);
     ctr = new FanController(model);
 
-    foreach(auto port , QSerialPortInfo::availablePorts())
-        ui->serialPortsSelector->addItem(port.serialNumber());
-
     ui->serialPortsSelector->installEventFilter(this);
 
     connect(ui->startup, SIGNAL(stateChanged(int)), this, SLOT(toggleFanStatu(int)));
-    connect(ctr, SIGNAL(parseError()), this, SLOT(configFileParseError()));
-    connect(this, SIGNAL(testEnable()), ctr, SLOT(wakeAndWaitForEnd()));
+    connect(ctr, &FanController::errorOccured, this, &Dialog::processError);
+    connect(this, SIGNAL(terminateTesting()), ctr, SLOT(wakeAndWaitForEnd()));
     connect(ui->RecordSelectorBtn, SIGNAL(clicked()), this, SLOT(setRecordFile()));
     connect(ui->configSettingBtn, SIGNAL(clicked()), this, SLOT(setConfigFile()));
 }
@@ -53,6 +50,16 @@ void Dialog::toggleFanStatu (int state)
             return;
         }
 
+        qDebug() << "current port number: " << ui->serialPortsSelector->currentIndex() << "current port name: " << ui->serialPortsSelector->currentText();
+        if (ui->serialPortsSelector->currentIndex() == -1) {
+            QMessageBox msgBox;
+            msgBox.setText(tr("请选择串口."));
+            msgBox.exec();
+
+            ui->startup->setCheckState(Qt::Unchecked);
+            return;
+        }
+
         model.bAuto = ui->autoModeEnableBox->isChecked();
         model.fanSpd = ui->speedLevelCombox->currentIndex() + 1;
         model.logFile = ui->RecordFilePathText->text();
@@ -66,7 +73,7 @@ void Dialog::toggleFanStatu (int state)
     }
     else if (state == Qt::Unchecked){
         qDebug() << tr("delete thread");
-        emit testEnable();
+        emit terminateTesting();
         QThread::currentThread()->yieldCurrentThread();
 //        ctr->exit(1);
         ctr->wait();
@@ -184,12 +191,31 @@ void Dialog::setConfigFile()
 
 }
 
-void Dialog::configFileParseError(void)
+void Dialog::processError(ctrErr err)
 {
-    ctr->terminate();
+
     QMessageBox msgBox;
-    msgBox.setText(tr("配置文件解析错误."));
+//    ctr->terminate();
+    if (err == FanController::JSON_PARSE_ERROR)
+        msgBox.setText(tr("配置文件解析错误！"));
+    else if (err == FanController::LOG_FILE_OPEN_ERROR) {
+        msgBox.setText(tr("不能打开日志文件！"));
+    }
+    else if (err == FanController::PORT_OPEN_ERROR) {
+        msgBox.setText(tr("不能打开串口！"));
+    }
+    else if (err == FanController::COMMAND_SEND_ERROR) {
+        msgBox.setText(tr("串口通信失败！"));
+    }
+    else {
+        msgBox.setText(tr("其他错误！！！"));
+    }
     msgBox.exec();
+
+    emit terminateTesting();
+    QThread::currentThread()->yieldCurrentThread();
+    ctr->wait();
+    enableWidgets();
 }
 
 bool Dialog::eventFilter(QObject *watched, QEvent *event)
@@ -215,5 +241,7 @@ bool Dialog::eventFilter(QObject *watched, QEvent *event)
             qDebug() << "focus out serialportsslector";
         }
     }
+
+    return QDialog::eventFilter(watched,event);
 }
 

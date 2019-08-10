@@ -12,6 +12,9 @@ namespace Ui {
 class dialog;
 }
 
+
+typedef FanController::Error ctrErr;
+
 class Dialog : public QDialog
 {
     Q_OBJECT
@@ -28,7 +31,7 @@ private:
     void disableWidgets(void);
 
 Q_SIGNALS:
-    void testEnable(void);
+    void terminateTesting(void);
 
 public Q_SLOTS:
     void toggleFanStatu (int);
@@ -37,7 +40,7 @@ public Q_SLOTS:
     void setFanDirection(bool);
     void setRecordFile();
     void setConfigFile();
-    void configFileParseError(void);
+    void processError(ctrErr err);
     bool eventFilter(QObject *,QEvent *);
 
 };
