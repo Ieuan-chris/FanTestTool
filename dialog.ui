@@ -35,16 +35,6 @@
        <enum>QLayout::SetMinAndMaxSize</enum>
       </property>
       <item>
-       <widget class="QComboBox" name="serialPortsSelector">
-        <property name="minimumSize">
-         <size>
-          <width>70</width>
-          <height>40</height>
-         </size>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QCheckBox" name="startup">
         <property name="text">
          <string>运行</string>
@@ -55,6 +45,19 @@
        <widget class="QCheckBox" name="autoModeEnableBox">
         <property name="text">
          <string>自动</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="serialPortsSelector">
+        <property name="minimumSize">
+         <size>
+          <width>70</width>
+          <height>40</height>
+         </size>
+        </property>
+        <property name="focusPolicy">
+         <enum>Qt::ClickFocus</enum>
         </property>
        </widget>
       </item>

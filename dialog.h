@@ -38,6 +38,7 @@ public Q_SLOTS:
     void setRecordFile();
     void setConfigFile();
     void configFileParseError(void);
+    bool eventFilter(QObject *,QEvent *);
 
 };
 

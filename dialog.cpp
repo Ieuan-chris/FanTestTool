@@ -25,6 +25,8 @@ Dialog::Dialog(FanModel &model, QWidget *parent) :
     foreach(auto port , QSerialPortInfo::availablePorts())
         ui->serialPortsSelector->addItem(port.serialNumber());
 
+    ui->serialPortsSelector->installEventFilter(this);
+
     connect(ui->startup, SIGNAL(stateChanged(int)), this, SLOT(toggleFanStatu(int)));
     connect(ctr, SIGNAL(parseError()), this, SLOT(configFileParseError()));
     connect(this, SIGNAL(testEnable()), ctr, SLOT(wakeAndWaitForEnd()));
@@ -188,5 +190,30 @@ void Dialog::configFileParseError(void)
     QMessageBox msgBox;
     msgBox.setText(tr("配置文件解析错误."));
     msgBox.exec();
+}
+
+bool Dialog::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == ui->serialPortsSelector)
+    {
+        if (event->type() == QEvent::FocusIn)
+        {
+            qDebug() << "focus in serialportsslector";
+            foreach(auto port, QSerialPortInfo::availablePorts()) {
+                if (ui->serialPortsSelector->findText(port.portName()) == -1)
+                    ui->serialPortsSelector->addItem(port.portName());
+            }
+            if (ui->serialPortsSelector->count() != QSerialPortInfo::availablePorts().count()) {
+                ui->serialPortsSelector->clear();
+                foreach(auto port, QSerialPortInfo::availablePorts()) {
+                    if (ui->serialPortsSelector->findText(port.portName()) == -1)
+                        ui->serialPortsSelector->addItem(port.portName());
+                }
+            }
+        }
+        if (event->type() == QEvent::FocusOut) {
+            qDebug() << "focus out serialportsslector";
+        }
+    }
 }
 
