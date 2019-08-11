@@ -31,13 +31,15 @@ public:
 
 Q_SIGNALS:
     void errorOccured(Error err);
+    void requestSerialoutToCurThread(QThread *);
+    void updateUserDisp(const QString &text);
 
 
 private:
     FanModel &model;
     bool bExit;
     bool parseConfig(QVector<TestItem> &testItems);
-    bool sendSubproInstruction(QSerialPort &out, const ItemProcedure &subItem, bool isStopMachine = false);
+    bool sendSubproInstruction(const ItemProcedure &subItem, bool isStopMachine = false);
     QWaitCondition cond;
     QMutex locker;
     QTextStream out;
@@ -49,8 +51,9 @@ protected:
 
 public Q_SLOTS:
     void wakeAndWaitForEnd(void);
-    void waitAllWritten(qint64 bytes);
-    void waitAllRead(void);
+    void receiveData(void);
+    void processSentData(qint64 bytes);
+    void moveSerialoutToOtherThread(QThread * target);
 
 
 };

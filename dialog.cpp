@@ -22,6 +22,7 @@ Dialog::Dialog(FanModel &model, QWidget *parent) :
     ui->speedLevelCombox->setCurrentIndex(0);
     ctr = new FanController(model);
 
+
     ui->serialPortsSelector->installEventFilter(this);
 
     connect(ui->startup, SIGNAL(stateChanged(int)), this, SLOT(toggleFanStatu(int)));
@@ -29,6 +30,8 @@ Dialog::Dialog(FanModel &model, QWidget *parent) :
     connect(this, SIGNAL(terminateTesting()), ctr, SLOT(wakeAndWaitForEnd()));
     connect(ui->RecordSelectorBtn, SIGNAL(clicked()), this, SLOT(setRecordFile()));
     connect(ui->configSettingBtn, SIGNAL(clicked()), this, SLOT(setConfigFile()));
+    connect(ctr, &FanController::updateUserDisp, ui->loggerText, &QTextBrowser::append);
+
 }
 
 Dialog::~Dialog()

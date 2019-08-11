@@ -46,8 +46,9 @@ const unsigned short FanController::crc16_table[256] =
 
 FanController::FanController(FanModel &model) : model(model), bExit(false), cond(), locker()
 {
-    connect(serialout, &QSerialPort::bytesWritten, this, &FanController::waitAllWritten);
-    connect(serialout, &QSerialPort::readyRead, this, &FanController::waitAllRead)
+    connect(&serialout, &QSerialPort::bytesWritten, this, &FanController::processSentData);
+//    connect(&serialout, &QSerialPort::readyRead, this, &FanController::receiveData);
+    connect(this, &FanController::requestSerialoutToCurThread, this, &FanController::moveSerialoutToOtherThread);
 }
 
 
@@ -73,7 +74,7 @@ void FanController::run()
         }
     }
 
-    QSerialPort port;
+
     QFile logFile(model.logFile);
 
     if (!bExit && !logFile.open(QFile::WriteOnly | QFile::Append)) {
@@ -88,7 +89,6 @@ void FanController::run()
     }
     if (!bExit) {
         out.setDevice(&logFile);
-
         serialout.setPortName(model.serialPortName);
 
         if (!serialout.open(QIODevice::ReadWrite)) {
@@ -106,7 +106,18 @@ void FanController::run()
         serialout.setDataBits(QSerialPort::Data8);
         serialout.setParity(QSerialPort::NoParity);
 
+        qDebug() << "before: " << serialout.thread();
+
+        if (serialout.thread() != currentThread())
+            emit requestSerialoutToCurThread(currentThread());
+        while(serialout.thread() != currentThread()) {
+            qDebug() << "wait serialout to currrent thread";
+            yieldCurrentThread();
+        }
+
     }
+
+
 
     qDebug() << tr("start test");
     while (!bExit) {
@@ -120,7 +131,7 @@ void FanController::run()
                 for (int i = 0; i < testItem.repeats; ++i) {
                     foreach(auto key, testItem.procedures.keys()) {
                         out << '\t' << "[ " << i << " ] SubItem: " << key << ":" << endl;
-                        if(!sendSubproInstruction(serialout, testItem.procedures.value(key))) {
+                        if(!sendSubproInstruction(testItem.procedures.value(key))) {
                             qDebug() << "send cmd failed";
 //                            bExit = true;
                             emit errorOccured(COMMAND_SEND_ERROR);
@@ -130,8 +141,14 @@ void FanController::run()
                         cond.wait(&locker, static_cast<unsigned long>(testItem.procedures.value(key).duration));
                         locker.unlock();
 
-                        if (bExit)
+                        if (bExit) {
+                            if(!sendSubproInstruction(testItem.procedures.value(key), true)) {
+                                qDebug() << "send cmd failed";
+    //                            bExit = true;
+                                emit errorOccured(COMMAND_SEND_ERROR);
+                            }
                             break;
+                        }
                     }
                     if (bExit)
                         break;
@@ -146,7 +163,7 @@ void FanController::run()
             single.duration = 0;
             single.spd = static_cast<short>(model.fanSpd);
             single.isForward = model.bForward;
-            if(!sendSubproInstruction(serialout, single)) {
+            if(!sendSubproInstruction(single)) {
                 qDebug() << "send cmd failed";
 //                bExit = true;
                 emit errorOccured(COMMAND_SEND_ERROR);
@@ -155,6 +172,12 @@ void FanController::run()
             locker.lock();
             cond.wait(&locker);
             locker.unlock();
+
+            if(!sendSubproInstruction(single, true)) {
+                qDebug() << "send cmd failed";
+//                bExit = true;
+                emit errorOccured(COMMAND_SEND_ERROR);
+            }
         }
 
         out.flush();
@@ -170,13 +193,14 @@ void FanController::run()
     if (logFile.isOpen()) {
         logFile.close();
     }
+    if (serialout.isOpen())
+        serialout.close();
 }
 
 bool FanController::parseConfig(QVector<TestItem> &testItems)
 {
     bool ret = false;
     // Todo: parse
-    qDebug() << model.configFile;
     QFile loadFile(model.configFile);
 
     if(!loadFile.open(QIODevice::ReadOnly))
@@ -220,12 +244,10 @@ bool FanController::parseConfig(QVector<TestItem> &testItems)
                 foreach(auto procedure, procedures) {
                     if (procedure.isObject()) {
                         QJsonObject proObj = procedure.toObject();
-//                            qDebug() << "Procedu :" << proObj.keys();
                         QString subProcedure = proObj.keys().at(0);
                         QJsonObject subPro = proObj.value(subProcedure).toObject();
                         foreach(auto sPdu, pduList) {
                             if (subPro.contains(sPdu)) {
-//                                    qDebug() << subPro.value(sPdu);
                                 if (sPdu == "forward") {
                                     itemProcedure.isForward = subPro.value(sPdu).toBool();
                                 } else if (sPdu == "speed"){
@@ -235,7 +257,6 @@ bool FanController::parseConfig(QVector<TestItem> &testItems)
                                 }
                             }
                         }
-                        qDebug() << subProcedure <<itemProcedure.spd << itemProcedure.isForward << itemProcedure.duration;
                         testItem.procedures.insert(subProcedure, itemProcedure);
                     }
                 }
@@ -257,15 +278,14 @@ void FanController::wakeAndWaitForEnd()
     locker.unlock();
 }
 
-bool FanController::sendSubproInstruction(QSerialPort &serialOut, const ItemProcedure &subItem, bool isStopMachine)
+bool FanController::sendSubproInstruction(const ItemProcedure &subItem, bool isStopMachine)
 {
     bool ret = true;
     if (out.device())
         out << '\t' << '\t' << "send cmd: " << "speed=" << subItem.spd << ", forward="
             << subItem.isForward << ", duration=" << subItem.duration << endl;
 
-    qDebug() << "Send cmd: " << "speed=" << subItem.spd << ", forward="
-             << subItem.isForward << ", duration=" << subItem.duration << endl;
+    emit updateUserDisp(QString("[CMD] motor: %1, speed: %2, forward: %3").arg(!isStopMachine).arg(subItem.spd).arg(subItem.isForward));
 
     // package the data frame
     QString spdStr = QString::number(subItem.spd, 16);
@@ -283,14 +303,13 @@ bool FanController::sendSubproInstruction(QSerialPort &serialOut, const ItemProc
 
     pack = QString::number(pack.size()/2+4, 16).rightJustified(4, '0') + pack;
 
-    qDebug() << pack;
 
 //    QChar* p = const_cast<QChar *>(pack.constData());
 //    ushort * up = static_cast<ushort *>(p);
     QString temp(pack);
     unsigned char datas[33];
+    bool ok;
     for (int i = 60; i > 0; i-=2) {
-        bool ok;
         QString s = temp.chopped(i);
         temp = temp.right(i);
         datas[(62-i)/2-1] = static_cast<unsigned char>(s.toInt(&ok, 16));
@@ -303,49 +322,71 @@ bool FanController::sendSubproInstruction(QSerialPort &serialOut, const ItemProc
 //    qDebug() << "dirStr: " << dirStr;
     unsigned short checkSum = crc16_table_256(0xFFFF, datas, 31);
     QString checkSumStr = QString::number(checkSum, 16);
-    qDebug() << "checkSum string: " << checkSumStr;
 
     pack = pack + checkSumStr.rightJustified(4, '0');
 
 
     char*  ch;
     QByteArray ba = pack.toLatin1(); // must
-    qDebug() << "ba" << ba;
     ch=ba.data();
-    qDebug() << ch;
 
-    if ( -1 != serialOut.write(ba))
+    serialout.setReadBufferSize(100);
+
+//    emit requestSerialDataWrite(ch, pack.size());
+    qDebug() << ba;
+    if ( -1 == serialout.write(ba))
         ret = false;
 
+    if (!serialout.waitForBytesWritten(500))
+        ret = false;
+
+
+    QByteArray rcvData;
+    while (serialout.waitForReadyRead(1000)) {
+        rcvData += serialout.readAll();
+
+//        qDebug() << "mid: " << rcvData.mid(0, 4) << " to Ushort: " << rcvData.mid(0,4).toUShort(&ok, 16);
+        if (rcvData.length() >=4 && rcvData.length() >= rcvData.mid(0, 4).toUShort(&ok, 16) * 2) {
+            ret = true;
+            break;
+        }
+    }
+
+
+
+
+    qDebug() << "rcvData: " << rcvData;
+
+//    qDebug() << "end :";
     return ret;
 }
 
-void FanController::waitAllWritten(qint64 bytes)
+void FanController::receiveData(void)
 {
+    qDebug() << "start receive data: ";
 
+    QByteArray rcvData = serialout.read(100);
+    qDebug() << "rcvData: " << rcvData;
 }
 
-void FanController::waitAllRead(void)
+void FanController::processSentData(qint64 bytes)
 {
-    QByteArray revData = serialout.readAll();
-
-    while (revData.length() != 5) {
-        if (serialout.waitForReadyRead(500))
-            revData.append(serialout.readAll());
-        else {
-            emit
-        }
-    }
+    qDebug() << "had sent data : "<< bytes << " bytes";
 }
+
 
 
 unsigned short FanController::crc16_table_256(unsigned short sum, unsigned char *p, unsigned int len)
 {
     while (len--)
     {
-        qDebug() << *p;
         sum = static_cast<unsigned short>(crc16_table[(sum >> 8) ^ *p++] ^ (sum << 8));
     }
 
     return sum;
+}
+
+void FanController::moveSerialoutToOtherThread(QThread * target)
+{
+    serialout.moveToThread(target);
 }
