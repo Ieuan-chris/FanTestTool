@@ -273,7 +273,7 @@ bool FanController::sendSubproInstruction(const ItemProcedure &subItem, bool isS
     QString pack = cmdStr.rightJustified(2, '0') + cmdParamStr.rightJustified(2, '0') +
             lightSettingStr.rightJustified(2, '0') + lightIntensityStr.rightJustified(2, '0') +
             motorSettingStr.rightJustified(2, '0') + spdStr.rightJustified(2, '0') +
-            dirStr.rightJustified(2, '0') + QString::number(0, 16).rightJustified(44, '0');
+            QString::number(0, 16).rightJustified(2, '0') + dirStr.rightJustified(2, '0') + QString::number(0, 16).rightJustified(42, '0');
 
     pack = QString::number(pack.size()/2+4, 16).rightJustified(4, '0') + pack;
 
