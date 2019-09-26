@@ -7,6 +7,7 @@
 
 
 struct ItemProcedure {
+    bool whoosh;
     short spd;
     bool isForward;
     int duration;

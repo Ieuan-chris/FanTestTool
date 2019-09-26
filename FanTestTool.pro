@@ -33,6 +33,7 @@ HEADERS += \
         dialog.h \
         fancontroller.h \
         fanmodel.h \
+        serialporthelper.h \
         testitem.h
 
 FORMS += \

@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include <QThread>
 #include <QFileDialog>
+#include <QMetaEnum>
 #include <QMessageBox>
 #include <QThread>
 #include <QtSerialPort/QSerialPortInfo>
@@ -198,21 +199,23 @@ void Dialog::processError(ctrErr err)
 {
 
     QMessageBox msgBox;
+    QMetaEnum enums = QMetaEnum::fromType<FanController::Error>();
 //    ctr->terminate();
-    if (err == FanController::JSON_PARSE_ERROR)
-        msgBox.setText(tr("配置文件解析错误！"));
-    else if (err == FanController::LOG_FILE_OPEN_ERROR) {
-        msgBox.setText(tr("不能打开日志文件！"));
-    }
-    else if (err == FanController::PORT_OPEN_ERROR) {
-        msgBox.setText(tr("不能打开串口！"));
-    }
-    else if (err == FanController::COMMAND_SEND_ERROR) {
-        msgBox.setText(tr("串口通信失败！"));
-    }
-    else {
-        msgBox.setText(tr("其他错误！！！"));
-    }
+//    if (err == FanController::JSON_PARSE_ERROR)
+//        msgBox.setText(tr("配置文件解析错误！"));
+//    else if (err == FanController::LOG_FILE_OPEN_ERROR) {
+//        msgBox.setText(tr("不能打开日志文件！"));
+//    }
+//    else if (err == FanController::PORT_OPEN_ERROR) {
+//        msgBox.setText(tr("不能打开串口！"));
+//    }
+//    else if (err == FanController::COMMAND_SEND_ERROR) {
+//        msgBox.setText(tr("串口通信失败！"));
+//    }
+//    else {
+//        msgBox.setText(tr("其他错误！！！"));
+//    }
+    msgBox.setText(enums.valueToKey(err));
     msgBox.exec();
 
     emit terminateTesting();

@@ -262,31 +262,33 @@ bool FanController::sendSubproInstruction(const ItemProcedure &subItem, bool isS
     emit updateUserDisp(QString("[CMD] motor: %1, speed: %2, forward: %3").arg(!isStopMachine).arg(subItem.spd).arg(subItem.isForward));
 
     // package the data frame
-    QString spdStr = QString::number(subItem.spd, 16);
+    QString spdStr = QString::number(subItem.spd-1, 16);
     QString dirStr = QString::number(subItem.isForward, 16);
     QString cmdStr = QString::number(0, 16);
     QString cmdParamStr = QString::number(1, 16);
-    QString lightSettingStr = QString::number(0, 16);
-    QString lightIntensityStr = QString::number(0, 16);
+    QString whooshStr = QString::number(0, 16);
     QString motorSettingStr = isStopMachine ? QString::number(0, 16) : QString::number(1, 16);
 
     QString pack = cmdStr.rightJustified(2, '0') + cmdParamStr.rightJustified(2, '0') +
-            lightSettingStr.rightJustified(2, '0') + lightIntensityStr.rightJustified(2, '0') +
-            motorSettingStr.rightJustified(2, '0') + spdStr.rightJustified(2, '0') +
-            QString::number(0, 16).rightJustified(2, '0') + dirStr.rightJustified(2, '0') + QString::number(0, 16).rightJustified(42, '0');
+            whooshStr.rightJustified(2, '0') + motorSettingStr.rightJustified(2, '0') +
+            spdStr.rightJustified(2, '0') + QString::number(0, 16).rightJustified(2, '0') +
+            dirStr.rightJustified(2, '0') + QString::number(1, 16).rightJustified(2, '0');
 
     pack = QString::number(pack.size()/2+4, 16).rightJustified(4, '0') + pack;
 
 
     QString temp(pack);
-    unsigned char datas[33];
+    unsigned char datas[12];
     bool ok;
-    for (int i = 60; i > 0; i-=2) {
+    for (int i = 18; i >= 0; i-=2) {
         QString s = temp.chopped(i);
         temp = temp.right(i);
-        datas[(62-i)/2-1] = static_cast<unsigned char>(s.toInt(&ok, 16));
+        datas[(20 - i)/2-1] = static_cast<unsigned char>(s.toInt(&ok, 16));
     }
-    unsigned short checkSum = crc16_table_256(0xFFFF, datas, 31);
+    for (uint i = 0; i < 12; ++i) {
+        qDebug() << datas[i] << "  ";
+    }
+    unsigned short checkSum = crc16_table_256(0xFFFF, datas, 10);
     QString checkSumStr = QString::number(checkSum, 16);
 
     pack = pack + checkSumStr.rightJustified(4, '0');
@@ -304,7 +306,7 @@ bool FanController::sendSubproInstruction(const ItemProcedure &subItem, bool isS
 
 //    emit requestSerialDataWrite(ch, pack.size());
     qDebug() << ba;
-    if ( -1 == serialout.write(sDatas.data(), 33))
+    if ( -1 == serialout.write(sDatas.data(), sDatas.length()))
         ret = false;
 
     if (!serialout.waitForBytesWritten(500))

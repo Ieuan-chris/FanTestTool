@@ -23,6 +23,7 @@ public:
     explicit FanController(FanModel &model);
 
     enum Error {JSON_PARSE_ERROR, LOG_FILE_OPEN_ERROR,PORT_OPEN_ERROR, COMMAND_SEND_ERROR};
+    Q_ENUM(Error)
     static unsigned short crc16_table_256(unsigned short sum, unsigned char *p, unsigned int len);
 //    void set_model(FanModel *model) {
 //        this->model = model;
